@@ -1,5 +1,7 @@
 {
-  "rewrites": [
-    { "source": "/api/raw/:id", "destination": "/api/raw/[id]" }
-  ]
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 10
+    }
+  }
 }
