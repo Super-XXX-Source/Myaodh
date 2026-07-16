@@ -1,23 +1,50 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import { v4 as uuidv4 } from 'uuid';
 
+// تهيئة Redis باستخدام المتغيرات البيئية
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
 export default async function handler(req, res) {
-  // نسمح فقط بطلبات POST
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { content } = req.body;
-  if (!content || content.trim() === '') {
-    return res.status(400).json({ error: 'المحتوى مطلوب' });
+  try {
+    const { content } = req.body;
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: 'المحتوى مطلوب' });
+    }
+
+    // التحقق من اتصال Redis
+    if (!redis) {
+      return res.status(500).json({ error: 'Redis غير مهيأ' });
+    }
+
+    // إنشاء معرف فريد
+    const id = uuidv4().slice(0, 8);
+    // تخزين النص في Redis
+    await redis.set(`raw:${id}`, content.trim());
+
+    // بناء الرابط
+    const host = req.headers.host || 'localhost:3000';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const url = `${protocol}://${host}/api/raw/${id}`;
+
+    res.status(200).json({ url });
+  } catch (error) {
+    console.error('خطأ:', error);
+    res.status(500).json({ error: 'فشل حفظ المحتوى: ' + error.message });
   }
-
-  // نولد معرفاً فريداً قصيراً (مثل abc123)
-  const id = uuidv4().slice(0, 8);
-  // نخزن النص في Vercel KV مع مفتاح raw:abc123
-  await kv.set(`raw:${id}`, content.trim());
-
-  // نبني الرابط النهائي
-  const url = `https://${req.headers.host}/api/raw/${id}`;
-  res.status(200).json({ url });
 }
