@@ -1,0 +1,23 @@
+import { kv } from '@vercel/kv';
+import { v4 as uuidv4 } from 'uuid';
+
+export default async function handler(req, res) {
+  // نسمح فقط بطلبات POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { content } = req.body;
+  if (!content || content.trim() === '') {
+    return res.status(400).json({ error: 'المحتوى مطلوب' });
+  }
+
+  // نولد معرفاً فريداً قصيراً (مثل abc123)
+  const id = uuidv4().slice(0, 8);
+  // نخزن النص في Vercel KV مع مفتاح raw:abc123
+  await kv.set(`raw:${id}`, content.trim());
+
+  // نبني الرابط النهائي
+  const url = `https://${req.headers.host}/api/raw/${id}`;
+  res.status(200).json({ url });
+}
