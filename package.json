@@ -2,7 +2,7 @@
   "name": "swag-raw-api",
   "version": "1.0.0",
   "dependencies": {
-    "@vercel/kv": "^1.0.0",
+    "@upstash/redis": "^1.28.0",
     "uuid": "^9.0.0"
   }
 }
