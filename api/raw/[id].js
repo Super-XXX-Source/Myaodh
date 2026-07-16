@@ -1,14 +1,28 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 export default async function handler(req, res) {
-  const { id } = req.query; // نأخذ المعرف من الرابط
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
-  const content = await kv.get(`raw:${id}`);
-  if (content === null) {
-    return res.status(404).send('المعرف غير موجود');
+  try {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).send('❌ المعرف غير موجود');
+    }
+
+    const content = await redis.get(`raw:${id}`);
+    if (content === null) {
+      return res.status(404).send('❌ المعرف غير صالح أو انتهت صلاحيته');
+    }
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(200).send(content);
+  } catch (error) {
+    console.error('خطأ:', error);
+    res.status(500).send('خطأ داخلي في الخادم');
   }
-
-  // نرسل النص كنص خام (Plain Text)
-  res.setHeader('Content-Type', 'text/plain');
-  res.status(200).send(content);
 }
